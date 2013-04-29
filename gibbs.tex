@@ -1,0 +1,129 @@
+\documentclass{revtex4}
+\synctex=1
+\usepackage{amsmath}
+
+\include{mathdef}
+
+
+
+
+\usepackage{xspace}
+\usepackage{xcolor}
+
+
+\usepackage{hyperref}
+\usepackage[capitalise,noabbrev,nameinlink]{cleveref}
+\renewcommand{\eqref}[1]{\cref{#1}}
+
+
+
+
+\newcommand{\tcite}[1]{[{\color{red} #1}]}
+
+\begin{document}
+
+\title{Gibbs Sampling for Redundant Baseline Calibration}
+
+\maketitle
+
+
+For an individual pair of feeds $ij$ we measure a signal $Y_{ij}$ which is a
+noisy measurement of a signal $y_{ij}$ modulated by an unknown complex gain
+for each feed $g_i$
+\begin{equation}
+\label{eq:sig_ij}
+Y_{ij} = g_i g_j^* y_{ij} + n_{ij} \; .
+\end{equation}
+
+However, in a compact array there are likely to be many redundant baselines
+which measure the same sky signal, giving a large amount of extra information
+for aiding calibration. To express this let us replace the indices $ij$ with
+an equivalent set $\alpha\beta$, where $\alpha$ iterates over all classes of
+identical baselines, and $\beta$ distinguishes between feedpairs within that
+class. This gives an alternate way to express \eqref{eq:sig_ij}
+\begin{equation}
+Y_{\alpha\beta} = g_{\alpha\beta} y_\alpha + n_{\alpha\beta} \; .
+\end{equation}
+In this form the gain term does not simply factorise $g_{\alpha\beta} = g_i
+g_j^*$, however, the true sky signal is now only indexed by $\alpha$ making
+its redundancy transparent. Both representation will be useful to us.
+
+
+Presuming the noise is described by a complex Gaussian the observed signal is distributed as 
+$p(Y_{\alpha\beta} | g_{\alpha\beta}, y_\alpha) \propto e^{-\chi^2}$ where
+\begin{equation}
+\label{eq:chi2ab}
+\chi^2 = \sum_{\alpha\beta} \frac{1}{\sigma_{\alpha\beta}^2}\lv Y_{\alpha\beta} - g_{\alpha\beta} y_\alpha \rv^2}
+\end{equation}
+%\quad\text{or equivalently}\quad
+\text{or equivalently}
+\begin{equation}
+\label{eq:chi2ij}
+\chi^2 = \sum_{i,j > i} \frac{1}{\sigma_{ij}^2}\lv Y_{ij} - g_i g_j^* y_{ij}\rv^2} \; .
+\end{equation}
+The summation of $j > i$ takes care of the equivalence between $ij$ and $ji$,
+and excludes auto-correlations. What we are interested in is the distribution
+of the unknown parameters, the set of gains $g_i$ and the true visibilities
+$y_\alpha$ --- using Bayes theorem, and for now applying a flat prior on both
+these quantities, we find that the \emph{joint} distribution of the two
+$p(g_{\alpha\beta}, y_\alpha | Y_{\alpha\beta}) \propto
+e^{-\frac{1}{2}\chi^2}$ is a complex non-Gaussian distribution.
+
+Examining \eqref{eq:chi2ab} we can see that within the $\chi^2$ summation
+$y_\alpha$ has a quadratic dependence. Similarly looking carefully at
+\eqref{eq:chi2ij} we can see that any individual $g_i$ is also quadratic if we
+exclude auto-correlations (the vector of gains obviously has a quartic
+dependence, but any indiviual component is at most second order). This fact
+means that the \emph{conditional} distributions $p(g_i | g_j, y_{ij}, Y_{ij})$
+and $p( y_\alpha | g_{\alpha\beta} , Y_{\alpha\beta})$ are both Gaussian, and
+we are able to efficiently draw samples from the joint distribution using
+\emph{Gibbs Sampling} \tcite{Mackay}.
+
+Let us derive exactly what the conditional distributions are. Knowing that
+they remain Gaussian (and still assuming a flat prior on the unknown
+parameters), we can simply expand out the $\chi^2$ to make the exact Gaussian
+form manifest. Starting with the easiest, $y_\alpha$, we find
+\begin{align}
+\label{eq:chi2ab}
+\chi^2 & = \lv y_\alpha \rv^2 \biggl[ \sum_{\beta} \frac{1}{\sigma_{\alpha\beta}^2} \lv g_{\alpha\beta} \rv^2 \biggr] - 
+    y_\alpha \biggl[ \sum_{\beta} \frac{1}{\sigma_{\alpha\beta}^2} g_{\alpha\beta} Y_{\alpha\beta}^* \biggr] - 
+    y_\alpha^* \biggl[ \sum_{\beta} \frac{1}{\sigma_{\alpha\beta}^2} g_{\alpha\beta}^* Y_{\alpha\beta} \biggr] + \ldots \\
+    & = \frac{1}{\sigma_{y_\alpha}^2} \lv y_\alpha - \mu_{y_\alpha} \rv^2 + \ldots
+\end{align}
+where the $(\ldots)$ hide all the terms not dependent on $y_\alpha$, and
+\begin{equation}
+\mu_{y_\alpha} = \biggl[ \sum_{\beta} \frac{1}{\sigma_{\alpha\beta}^2} g_{\alpha\beta}^* Y_{\alpha\beta} \biggr] \biggr[ \sum_{\beta} \frac{1}{\sigma_{\alpha\beta}^2} \lv g_{\alpha\beta} \rv^2 \biggr]^{-1}
+\; \text{and} \quad
+\sigma_{y_\alpha}^2 = \biggr[ \sum_{\beta} \frac{1}{\sigma_{\alpha\beta}^2} \lv g_{\alpha\beta} \rv^2 \biggr]^{-1} \; .
+\end{equation}
+As the notation suggests these are the mean and variance of the conditional
+distribution of $y_\alpha$. We can do the same for the gains, by expanding
+\eqref{eq:chi2ij} for a particular $g_i$ (where the $j$ indexes over all other
+feeds)
+\begin{align}
+\chi^2 &= \lv g_i \rv^2 \sum_j \frac{1}{\sigma_{ij}^2} \lv g_j y_{ij} \rv^2 -
+    g_i \sum_j \frac{1}{\sigma_{ij}^2} g_j^* y_{ij} Y_{ij}^*  -
+    g_i^* \sum_j \frac{1}{\sigma_{ij}^2} g_j y_{ij}^* Y_{ij} + \ldots \\
+    & = \frac{1}{\sigma_{g_i}^2} \lv g_i - \mu_{g_i} \rv^2 + \ldots
+\end{align}
+where again the mean and variance of the distribution are
+\begin{equation}
+\mu_{g_i} = \biggl[ \sum_j \frac{1}{\sigma_{ij}^2} g_j y_{ij}^* Y_{ij} \biggr] \biggr[ \sum_{j} \frac{1}{\sigma_{ij}^2} \lv g_j y_{ij} \rv^2 \biggr]^{-1}
+\; \text{and} \quad
+\sigma_{g_i}^2 = \biggr[ \sum_{j} \frac{1}{\sigma_{ij}^2} \lv g_j y_{ij} \rv^2 \biggr]^{-1} \; .
+\end{equation}
+In the above we must be careful as there are some subtleties as to how we sum
+over all other feeds, given that we were originally summing over all $j > i$.
+To fix the types of terms summed over, we make use of our freedom in labelling
+such that particular $i$ is the lowest indexed feed, and all other $j$ must be
+greater than $i$.
+
+Unfortunately we can not uniquely determine the system given only the
+$Y_{ij}$. First, there is a global phase ambiguity in the gains such that
+transformations $g_i \rightarrow g_i e^{i \phi}$ leave $\chi^2$ unchanged.
+Similarly the amplitudes of the gains and the true visibilities are degenerate
+under the transformations $y_{ij} \rightarrow \alpha y_{ij}$ and $g_i
+\rightarrow g_i / \alpha^{1/2}$. Both these can be solved by fixing one gain
+to be constant, in our case we always set $g_0 = 1$.
+
+\end{document}
